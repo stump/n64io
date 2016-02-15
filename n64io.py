@@ -108,6 +108,24 @@ class N64Controller(object):
         status = self._do_status()
         return bool(status[2] & 0x01)
 
+    # For certain Pak types, some 0x1000-byte chunks of the upper half of the
+    # expansion port address space represent a single 8-bit value (present on
+    # every byte) that has some particular function. We'll call these "registers."
+
+    def _pak_register_read(self, reg):
+        '''
+        Get a "register" (value mapped into a chunk of the expansion address space)
+        given the upper nibble of its address.
+        '''
+        return self._do_pak_read(reg << 12)[31]
+
+    def _pak_register_write(self, reg, value):
+        '''
+        Set a "register" (value mapped into a chunk of the expansion address space)
+        given the upper nibble of its address.
+        '''
+        self._do_pak_write(reg << 12, bytes((value,)) * 32)
+
     # Determining what is plugged into the expansion port sadly requires probing.
     # Different Pak types have different values that 0x8000 can be set to.
 
@@ -116,9 +134,9 @@ class N64Controller(object):
         Determine whether the controller has a Transfer Pak plugged in.
         '''
         old_block = self._do_pak_read(0x8000)
-        self._do_pak_write(0x8000, b'\x84' * 32)
-        if self._do_pak_read(0x8000) == b'\x84' * 32:
-            self._do_pak_write(0x8000, b'\xfe' * 32)
+        self._pak_register_write(0x8, 0x84)
+        if self._pak_register_read(0x8) == 0x84:
+            self._pak_register_write(0x8, 0xfe)
             self._do_pak_write(0x8000, old_block)
             return True
         self._do_pak_write(0x8000, old_block)
@@ -129,9 +147,9 @@ class N64Controller(object):
         Determine whether the controller has a Rumble Pak plugged in.
         '''
         old_block = self._do_pak_read(0x8000)
-        self._do_pak_write(0x8000, b'\xfe' * 32)
-        self._do_pak_write(0x8000, b'\x80' * 32)
-        if self._do_pak_read(0x8000) == b'\x80' * 32:
+        self._pak_register_write(0x8, 0xfe)
+        self._pak_register_write(0x8, 0x80)
+        if self._pak_register_read(0x8) == 0x80:
             self._do_pak_write(0x8000, old_block)
             return True
         self._do_pak_write(0x8000, old_block)
@@ -139,17 +157,17 @@ class N64Controller(object):
 
     def tpak_set_power(self, power):
         if power:
-            self._do_pak_write(0x8000, b'\x84' * 32)
+            self._pak_register_write(0x8, 0x84)
         else:
-            self._do_pak_write(0x8000, b'\xfe' * 32)
+            self._pak_register_write(0x8, 0xfe)
 
     def tpak_get_power(self):
-        return self._do_pak_read(0x8000) == b'\x84' * 32
+        return self._pak_register_read(0x8) == 0x84
 
     def tpak_detect_pak(self):
         self._tpak_high_bits = -1
-        self._do_pak_write(0xb000, b'\x01' * 32)
-        return self._do_pak_read(0xb000) == b'\x89' * 32
+        self._pak_register_write(0xb, 0x01)
+        return self._pak_register_read(0xb) == 0x89
 
     def tpak_read(self, addr):
         '''
@@ -158,7 +176,7 @@ class N64Controller(object):
         '''
         if addr >> 14 != self._tpak_high_bits:
             self._tpak_high_bits = addr >> 14
-            self._do_pak_write(0xa000, bytes((self._tpak_high_bits,)) * 32)
+            self._pak_register_write(0xa, self._tpak_high_bits)
         return self._do_pak_read(addr | 0xc000)
 
     def tpak_write(self, addr, data):
@@ -168,7 +186,7 @@ class N64Controller(object):
         '''
         if addr >> 14 != self._tpak_high_bits:
             self._tpak_high_bits = addr >> 14
-            self._do_pak_write(0xa000, bytes((self._tpak_high_bits,)) * 32)
+            self._pak_register_write(0xa, self._tpak_high_bits)
         return self._do_pak_write(addr | 0xc000, data)
 
 
