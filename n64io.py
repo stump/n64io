@@ -112,6 +112,9 @@ class N64Controller(object):
     # Different Pak types have different values that 0x8000 can be set to.
 
     def pak_is_transfer_pak(self):
+        '''
+        Determine whether the controller has a Transfer Pak plugged in.
+        '''
         old_block = self._do_pak_read(0x8000)
         self._do_pak_write(0x8000, b'\x84' * 32)
         if self._do_pak_read(0x8000) == b'\x84' * 32:
@@ -122,6 +125,9 @@ class N64Controller(object):
         return False
 
     def pak_is_rumble_pak(self):
+        '''
+        Determine whether the controller has a Rumble Pak plugged in.
+        '''
         old_block = self._do_pak_read(0x8000)
         self._do_pak_write(0x8000, b'\xfe' * 32)
         self._do_pak_write(0x8000, b'\x80' * 32)
@@ -146,12 +152,20 @@ class N64Controller(object):
         return self._do_pak_read(0xb000) == b'\x89' * 32
 
     def tpak_read(self, addr):
+        '''
+        Read a 32-byte-aligned group of 32 bytes from the address space of the
+        Game Boy cartridge in the Transfer Pak plugged into the controller.
+        '''
         if addr >> 14 != self._tpak_high_bits:
             self._tpak_high_bits = addr >> 14
             self._do_pak_write(0xa000, bytes((self._tpak_high_bits,)) * 32)
         return self._do_pak_read(addr | 0xc000)
 
     def tpak_write(self, addr, data):
+        '''
+        Write a 32-byte-aligned group of 32 bytes to the address space of the
+        Game Boy cartridge in the Transfer Pak plugged into the controller.
+        '''
         if addr >> 14 != self._tpak_high_bits:
             self._tpak_high_bits = addr >> 14
             self._do_pak_write(0xa000, bytes((self._tpak_high_bits,)) * 32)
